@@ -1,0 +1,220 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+
+<html lang="en">
+
+<style>
+
+.line{
+	fill: none;
+	stroke: #ffcc00;
+  	stroke-width: 2px;
+}
+
+.domain {
+    fill: none;
+    stroke: black;
+}
+
+.tick line {
+    stroke: black;
+}
+
+.tick {
+    font-size: 10px;
+}
+
+.average_line {
+	fill: none;
+	stroke: #000099;
+  stroke-width: 2px;
+}
+
+ul.comments {
+	font-size: 16px;
+	width: 700px;
+	position: absolute;
+	top: 250px;
+	left: 160px;
+}
+
+ul.comments li {
+	line-height: 1.5em;
+}
+	
+	
+</style>
+
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Strikeouts</title>
+	<meta name="generator" content="TextMate http://macromates.com/">
+	<meta name="author" content="Diego Ponce de Leon Barido">
+	<!-- Date: 2013-09-25 -->
+	<h1> Strikeouts on the Rise </h1>
+	<p> Pitchers are either getting really good, or batters really bad</p>
+	<div class = "chart"></div>
+</head>
+<body>
+	
+	<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+	<script type = "text/javascript">
+	
+	//We'll start by makig a scatterplot, for which we'll need two scaales. First we need svg element to put our chart into. This code goes into anything potentially useful	
+	var margin = {top:20, right: 20, bottom: 20, left:20 };	
+	var width = 750 - margin.left - margin.right,
+	   height = 500 - margin.top - margin.bottom;
+
+	var svg = d3.select(".chart").append("svg")
+	  .attr("width", width + margin.left + margin.right)
+	  .attr("height", height + margin.top + margin.bottom)
+	  .append("g")
+	  .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+	// Now we'll need an xScale
+	var xScale = d3.scale.linear()
+		.domain([1900,2012])
+		.range([0,width]);
+
+	//Now we're adding a yscale
+	var yScale = d3.scale.linear()
+		.domain([0,10])
+		.range([height,0]);
+		
+	//Loading the data
+	d3.csv("strikeouts.csv", function(data){
+				
+		data.forEach(function(d) {
+			
+		//What are the Ds doing here? Are we addint the variables to the environment?	
+		d.so = +d.so;
+		d.year = +d.year;
+		d.g = +d.g;
+		//We also to calculate the strikeouts per game and store it as a new column
+		d.kpg = d.so/d.g;
+		// console.log(data);			
+		});
+		
+		//This was Being Used for All Data
+		// var data = data.filter(function(d) { return d.franchise });
+		
+		//This was being used for all data
+		//And now for the magical data join
+		// svg.selectAll(".dot")
+		// 	.data(data)
+		// 	.enter().append("circle")
+		// 		.attr("class", "dot")
+		// 		.attr("r",5)
+		// 		.attr("cx", function(d,i) {return xScale(d.year); })
+		// 		.attr("cy", function(d) {return yScale(d.kpg);   });
+				
+		//This is currently being used for just one team - Oakland
+		var OakData = data.filter(function(d) {return d.franchise === "OAK"});
+		//And now for the magical data join		
+		svg.selectAll(".dots")
+			.data(OakData)
+			.enter().append("circle")
+				.attr("class", "dot")
+				.attr("r",2)
+				.attr("cx", function(d,i) {return xScale(d.year); })
+				.attr("cy", function(d) {return yScale(d.kpg);   });		
+				
+		//Creates a function for us that we are saving as line and this function will take a data set and spit out the proper code to make an SVG path element		
+		var line = d3.svg.line()
+					.x(function(d) {return xScale(d.year); })
+					.y(function(d) {return yScale(d.kpg) });
+		
+		//Creates a line but I created a class above so that I can 			
+		svg.append("path")
+			.attr("class","line")
+			.attr("d", line(OakData));
+			
+		//Now lets create an axis. This doesn't create the axis, it only creates an a function that will later create an axis
+		var xAxis = d3.svg.axis()
+			.tickFormat(function(d) {return d; })
+			.scale(xScale);
+
+		// Let's use this generator to generate some svg code
+		svg.append("g")
+			.attr("class","axis")
+			//This piece of codes brings it to the bottom
+			.attr("transform", "translate(0, " + height + ")")
+			.call(xAxis);
+		
+		
+		//Cool Blamo Function
+			// d3.select(".chart").append("button").text("Blamo!").on("click", function() {
+			//     d3.selectAll("circle")
+			//         .transition()
+			//         .duration(2000)
+			//         .ease("bounce")
+			//         .delay(function(d, i){ return i * 50})
+			//         .attr("cy", height)
+			//         .attr("r", 7);
+			// });
+			// 		
+			
+			
+		//Creating a Y Axis
+		var yAxis = d3.svg.axis()
+			.tickFormat(function(d) {return d;})
+			.scale(yScale)
+			.orient("right");
+			
+		//Actually Creating it
+		svg.append("g")
+					.attr("class","axis")
+					.attr("transform","translate(" + width + ",0)")
+					.call(yAxis);
+				
+		//Entering Another Team
+		nested = d3.nest()
+			.key(function(d) {return d.year; })
+			.rollup(function(values) {
+				
+			return{
+				totalGames: d3.sum(values, function(d) {return d.g}),
+				totalStrikeouts: d3.sum(values, function(d) {return d.so}),
+				leagueAvg: d3.sum(values, function(d) {return d.so}) / d3.sum(values, function(d) {return d.g})
+				  };
+				
+			})
+			.entries(data);
+			
+		svg.selectAll(".dot")
+			.data(nested)
+			.enter().append("circle")
+				.attr("class","dot")
+				.attr("r",2)
+				.attr("cx", function(d,i) {return xScale(d.key); })
+				
+		var average_line = d3.svg.line()
+			.x(function(d) {return xScale(d.key); })
+			.y(function(d) {return yScale(d.values.leagueAvg); });
+			
+		svg.append("path")
+			.attr("class","average_line")
+			.attr("d", average_line(nested));
+			
+		var comment = d3.select("body").append("ul").attr("class","comments");
+		 comment.append("li").text("I wish the Giants won every year!")	;
+				
+				
+		//Here we're swtiching the range values and hardcoded a better max for our domain. 
+		// .domain([0, d3.max(data, function(d) { return d.kpg; })])
+						
+		
+	});
+	
+
+	
+
+
+
+	</script>
+
+	
+
+</body>
+</html>
